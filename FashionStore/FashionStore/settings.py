@@ -169,22 +169,24 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
+# https://docs.djangoproject.com/en/5.2/topics/files/
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS=[os.path.join(BASE_DIR,'static')]
-STATIC_ROOT = BASE_DIR / 'staticfiles' # <--- ADD THIS LINE: Collects all static files here for WhiteNoise
+STATIC_ROOT = BASE_DIR / 'staticfiles' # Collects all static files here for WhiteNoise
 
 # WhiteNoise storage configuration for optimized static file serving
 STORAGES = {
+    "default": { # <--- ADD THIS BLOCK for default file storage (e.g., for media files)
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage", # <--- ADD THIS BLOCK
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+# https://docs.djangoproject.com/en/5.2/topics/db/models/#automatic-primary-key-fields
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

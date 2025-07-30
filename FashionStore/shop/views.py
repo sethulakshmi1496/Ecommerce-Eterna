@@ -1,5 +1,3 @@
-# shop/views.py
-
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
 from django.views.generic import ListView, DetailView
@@ -20,112 +18,299 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 
+# AI/NLP Libraries
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.svm import LinearSVC
+import spacy
 
 # Assuming your models are in .models
 from .models import Category, SubCategory, Product, CustomUser
 from .forms import SignupForm, LoginForm, CategoryForm, ProductForm
 
-# Load spaCy model globally
+# Load spaCy model globally (only once)
 nlp = None
+try:
+    nlp = spacy.load("en_core_web_sm")
+    print("spaCy model 'en_core_web_sm' loaded successfully.")
+except OSError:
+    print("spaCy model 'en_core_web_sm' not found. Please run 'python -m spacy download en_core_web_sm' in your terminal.")
+    # Fallback if spacy model is not found, product extraction won't use tokenization fully
+    pass # Continue without nlp, but extraction might be less precise
 
-
-# --- Chatbot AI Model Training (Global Scope)
+# --- Chatbot AI Model Training (Global Scope) ---
 INTENTS_DATA_PATH = os.path.join(settings.BASE_DIR, 'shop', 'chatbot_intents.json')
 intents = []
 vectorizer = None
 clf = None
 
+try:
+    with open(INTENTS_DATA_PATH, 'r', encoding='utf-8') as f:
+        intents = json.load(f)
+    print(f"Chatbot intents loaded successfully from {INTENTS_DATA_PATH}. {len(intents)} intents found.")
 
+    training_sentences = []
+    training_labels = []
+    for intent in intents:
+        for pattern in intent['patterns']:
+            training_sentences.append(pattern.lower())
+            training_labels.append(intent['tag'])
+
+    if training_sentences:
+        vectorizer = TfidfVectorizer()
+        X_train = vectorizer.fit_transform(training_sentences)
+        clf = LinearSVC()
+        clf.fit(X_train, training_labels)
+        print("Chatbot intent model trained successfully using TF-IDF and LinearSVC.")
+    else:
+        print("WARNING: No training sentences found in intents data. Intent recognition will not work.")
+
+except FileNotFoundError:
+    print(f"ERROR: chatbot_intents.json not found at {INTENTS_DATA_PATH}. Chatbot intent recognition will be limited.")
+    intents = []
+except json.JSONDecodeError as e:
+    print(f"ERROR: Could not decode JSON from {INTENTS_DATA_PATH}. Check file format. Error: {e}")
+    intents = []
+except Exception as e:
+    print(f"ERROR: An unexpected error occurred during chatbot model loading/training: {e}")
+    import traceback
+    traceback.print_exc()
+
+# --- Chatbot Logic Helper Function ---
 def _get_chatbot_response_logic(user_message_str):
     user_message_lower = user_message_str.lower().strip()
 
     predicted_tag = "fallback"
+    # Adjust this threshold based on testing. A slightly negative value often works for LinearSVC
+    # if you want to be somewhat confident, but not overly strict. 0.0 might be better for "positive" classification.
+    # For a multi-class classifier like LinearSVC, the decision_function returns scores relative to decision boundaries.
+    # A score of 0 indicates the message is on the decision boundary. Positive scores are on one side, negative on the other.
+    # For a multi-class setup, it's about the largest score.
+    # A common approach is to look at the *difference* between the top two scores, or just take the top one.
+    # Let's start with a simpler approach based on whether it's above a certain confidence level
+    # or if the model was not loaded.
+    confidence_threshold = 0.1 # A small positive threshold implies "some" confidence
 
-    # Since clf and vectorizer are None, this 'else' block will always execute
-    print("WARNING: Chatbot model not loaded/trained. Falling back to simple keyword matching.")
-    if any(kw in user_message_lower for kw in ["hi", "hello", "hey"]):
-        predicted_tag = "greeting"
-    elif any(kw in user_message_lower for kw in ["bye", "goodbye", "see you"]):
-        predicted_tag = "goodbye"
-    elif any(kw in user_message_lower for kw in ["show me", "find product", "looking for", "products"]):
-        predicted_tag = "product_search_query"
-    elif any(kw in user_message_lower for kw in ["thank", "thanks"]):
-        predicted_tag = "thanks"
-    elif any(kw in user_message_lower for kw in ["contact", "support", "help"]):
-        predicted_tag = "contact_support_query"
-    elif any(kw in user_message_lower for kw in ["about you", "who are you"]):
-        predicted_tag = "about_bot"
-    elif any(kw in user_message_lower for kw in ["return", "exchange"]):
-        predicted_tag = "return_policy"
-    elif any(kw in user_message_lower for kw in ["delivery", "shipping"]):
-        predicted_tag = "shipping_info"
-    elif any(kw in user_message_lower for kw in ["payment", "pay"]):
-        predicted_tag = "payment_options"
+    if clf and vectorizer:
+        user_message_vectorized = vectorizer.transform([user_message_lower])
+        # decision_function gives scores for each class. The class with the highest score is the predicted one.
+        # For multi-class, it often provides (n_samples, n_classes) array of distances to hyperplanes.
+        scores = clf.decision_function(user_message_vectorized)[0]
+        max_score_index = scores.argmax()
+        highest_confidence_score = scores[max_score_index]
+        potential_tag = clf.classes_[max_score_index]
+
+        print(f"DEBUG: User message: '{user_message_lower}'")
+        print(f"DEBUG: Potential tag: {potential_tag}, Highest Confidence Score: {highest_confidence_score:.2f}")
+
+        # You might need to experiment with `highest_confidence_score`
+        # If it's the highest score among all, it's the prediction.
+        # The threshold helps filter out very weak predictions that might be better handled by fallback.
+        if highest_confidence_score > confidence_threshold:
+            predicted_tag = potential_tag
+        else:
+            print(f"DEBUG: Highest confidence score {highest_confidence_score:.2f} is below threshold {confidence_threshold}, falling back.")
+            predicted_tag = "fallback"
+    else:
+        print("WARNING: Chatbot model not loaded/trained. Falling back to simple keyword matching for basic intents.")
+        # This basic keyword matching should only be a very simple fallback if ML fails completely.
+        # The goal is for the ML model to handle almost everything.
+        if any(kw in user_message_lower for kw in ["hi", "hello", "hey", "greetings"]):
+            predicted_tag = "greeting"
+        elif any(kw in user_message_lower for kw in ["bye", "goodbye", "see you", "farewell"]):
+            predicted_tag = "goodbye"
+        elif any(kw in user_message_lower for kw in ["thank you", "thanks", "appreciate"]):
+            predicted_tag = "thanks"
+        elif any(kw in user_message_lower for kw in ["who are you", "what are you", "are you ai"]):
+            predicted_tag = "identity"
+        elif any(kw in user_message_lower for kw in ["how can i pay", "payment methods"]):
+            predicted_tag = "payment_methods"
+        elif any(kw in user_message_lower for kw in ["shipping time", "delivery time"]):
+            predicted_tag = "shipping_time"
+        elif any(kw in user_message_lower for kw in ["return policy", "returns", "refund"]):
+            predicted_tag = "return_policy"
+        elif any(kw in user_message_lower for kw in ["international shipping", "ship internationally"]):
+            predicted_tag = "international_shipping"
+        elif any(kw in user_message_lower for kw in ["track my order", "order status"]):
+            predicted_tag = "track_order"
+        elif any(kw in user_message_lower for kw in ["contact support", "customer service"]):
+            predicted_tag = "contact_support"
+        elif any(kw in user_message_lower for kw in ["change order", "cancel order"]):
+            predicted_tag = "change_cancel_order"
+        elif any(kw in user_message_lower for kw in ["complaint", "issue with order"]):
+            predicted_tag = "register_complaint"
+        elif any(kw in user_message_lower for kw in ["rate", "review", "feedback"]):
+            predicted_tag = "rate_review"
+        elif any(kw in user_message_lower for kw in ["suggestions", "idea for improvement"]):
+            predicted_tag = "suggestions"
+        elif any(kw in user_message_lower for kw in ["about us", "who is eterna"]):
+            predicted_tag = "about_us"
+        elif any(kw in user_message_lower for kw in ["browse products", "show me products", "what do you sell"]):
+            predicted_tag = "browse_products"
+        elif any(kw in user_message_lower for kw in ["find a product", "search for an item", "looking for", "show me"]):
+            predicted_tag = "product_search_query"
+        elif any(kw in user_message_lower for kw in ["recommend products", "suggest products"]):
+            predicted_tag = "product_recommendations"
+        elif any(kw in user_message_lower for kw in ["product information", "details about product"]):
+            predicted_tag = "product_info"
+        elif any(kw in user_message_lower for kw in ["is it in stock", "check stock"]):
+            predicted_tag = "check_stock"
+        elif any(kw in user_message_lower for kw in ["complementary products", "what else goes with this"]):
+            predicted_tag = "upsell_cross_sell"
+        elif any(kw in user_message_lower for kw in ["promotions", "deals", "discounts", "sales"]):
+            predicted_tag = "promotions"
+        elif any(kw in user_message_lower for kw in ["size guide", "what's my size"]):
+            predicted_tag = "size_guide"
+        elif any(kw in user_message_lower for kw in ["cart assistance", "my cart", "checkout issues"]):
+            predicted_tag = "cart_assistance"
+        elif any(kw in user_message_lower for kw in ["add to cart", "buy item", "how to purchase"]):
+            predicted_tag = "add_to_cart_instruction"
+        elif any(kw in user_message_lower for kw in ["payment problem", "checkout help"]):
+            predicted_tag = "payment_gateway_help"
+        elif any(kw in user_message_lower for kw in ["shipping cost", "delivery estimates"]):
+            predicted_tag = "shipping_cost"
+        elif any(kw in user_message_lower for kw in ["lead generation", "contact me", "get updates"]):
+            predicted_tag = "lead_generation"
+        elif any(kw in user_message_lower for kw in ["create account", "sign up", "register"]):
+            predicted_tag = "create_account"
+        elif any(kw in user_message_lower for kw in ["checkout as guest", "guest checkout"]):
+            predicted_tag = "guest_checkout"
+        elif any(kw in user_message_lower for kw in ["reset password", "forgot password"]):
+            predicted_tag = "reset_password"
+        elif any(kw in user_message_lower for kw in ["digital receipt", "invoice", "get receipt"]):
+            predicted_tag = "digital_receipts"
+        elif any(kw in user_message_lower for kw in ["meaning of life", "philosophy", "purpose of existence"]):
+            predicted_tag = "philosophical_query"
+        # If no specific keyword match and ML model failed, it remains fallback.
 
 
+    # --- Product Search and Entity Extraction (if predicted_tag is product_search_query) ---
     if predicted_tag == "product_search_query":
+        # Product extraction logic: Use spaCy if available, otherwise simple keyword checks
         product_item_type = None
         color = None
         size = None
         main_category_preference = None
+        search_query_term = user_message_lower # Used as a fallback if no specific entities are extracted
+
+        # Use spaCy for more robust extraction if nlp model is loaded
+        if nlp:
+            doc = nlp(user_message_lower)
+            # Gender/Main Category extraction
+            if any(keyword in user_message_lower for keyword in ["women's wear", "womens wear", "ladies wear", "women", "ladies", "female"]):
+                main_category_preference = "women_clothing"
+            elif any(keyword in user_message_lower for keyword in ["men's wear", "mens wear", "gent's wear", "gents wear", "men", "gents", "male"]):
+                main_category_preference = "men_clothing"
+            elif any(keyword in user_message_lower for keyword in ["kid's wear", "kids wear", "children's wear", "kids", "children", "boys", "girls"]):
+                main_category_preference = "kid_clothing"
+            elif any(keyword in user_message_lower for keyword in ["shoes", "shoe", "footwear", "sneakers", "boots"]):
+                main_category_preference = "shoes"
+            elif any(keyword in user_message_lower for keyword in ["bags", "bag", "backpacks", "purse", "handbag"]):
+                main_category_preference = "bags"
+            elif any(keyword in user_message_lower for keyword in ["accessories", "accessory", "jewellery", "jewelry", "watches", "earrings", "necklace", "ring", "bracelet", "belt"]):
+                main_category_preference = "accessories"
 
 
-        if any(keyword in user_message_lower for keyword in ["shoes", "shoe", "footwear", "sneakers", "boots"]):
-            main_category_preference = "shoes"
-        elif any(keyword in user_message_lower for keyword in ["bags", "bag", "backpacks", "purse", "handbag"]):
-            main_category_preference = "bags"
-        elif any(keyword in user_message_lower for keyword in
-                 ["accessories", "accessory", "jewellery", "jewelry", "watches", "earrings", "necklace", "ring", "bracelet", "belt"]):
-            main_category_preference = "accessories"
-        elif any(keyword in user_message_lower for keyword in
-                 ["women's wear", "womens wear", "ladies wear", "women", "ladies", "female", "dresses", "skirts", "tops"]):
-            main_category_preference = "women_clothing"
-        elif any(keyword in user_message_lower for keyword in
-                 ["men's wear", "mens wear", "gent's wear", "gents wear", "men", "gents", "male", "shirts", "pants"]):
-            main_category_preference = "men_clothing"
-        elif any(keyword in user_message_lower for keyword in
-                 ["kid's wear", "kids wear", "children's wear", "kids", "children", "boys", "girls"]):
-            main_category_preference = "kid_clothing"
+            product_type_keywords = {
+                "dresses": "dress", "dress": "dress", "gown": "dress",
+                "t-shirts": "t-shirt", "tshirt": "t-shirt", "tee": "t-shirt",
+                "pants": "pant", "jeans": "jeans", "trouser": "pant",
+                "shirts": "shirt", "shirt": "shirt",
+                "top": "top", "tops": "top",
+                "jackets": "jacket", "jacket": "jacket", "coat": "jacket",
+                "skirts": "skirt", "skirt": "skirt",
+                "saree": "saree", "sarees": "saree", "sari": "saree",
+                "hoodie": "hoodie", "sweatshirt": "sweatshirt",
+                "shorts": "shorts", "leggings": "leggings", "trousers": "trousers",
+            }
 
-        product_type_keywords = {
-            "dresses": "dress", "dress": "dress", "gown": "dress",
-            "t-shirts": "t-shirt", "tshirt": "t-shirt", "tee": "t-shirt",
-            "pants": "pant", "jeans": "jeans", "trouser": "pant",
-            "shirts": "shirt", "shirt": "shirt",
-            "top": "top", "tops": "top",
-            "jackets": "jacket", "jacket": "jacket", "coat": "jacket",
-            "skirts": "skirt", "skirt": "skirt",
-            "saree": "saree", "sarees": "saree", "sari": "saree",
-            "hoodie": "hoodie", "sweatshirt": "sweatshirt",
-            "shorts": "shorts", "leggings": "leggings", "trousers": "trousers",
-        }
-        for kw, val in product_type_keywords.items():
-            if kw in user_message_lower:
-                product_item_type = val
-                break
+            for token in doc:
+                # Prioritize exact matches, then lemma matches
+                if token.text in product_type_keywords:
+                    product_item_type = product_type_keywords[token.text]
+                    break
+                elif token.lemma_ in product_type_keywords:
+                    product_item_type = product_type_keywords[token.lemma_]
+                    break
+                # Consider dependency parsing if more advanced rules are needed, e.g., "red shirt" where "shirt" is the object.
+                # if token.dep_ == 'dobj' and token.pos_ == 'NOUN' and token.text in product_type_keywords:
+                #     product_item_type = product_type_keywords[token.text]
+                #     break
 
-        colors = ["red", "blue", "green", "black", "white", "pink", "yellow", "orange", "purple", "brown", "grey",
-                  "silver", "gold"]
-        for c in colors:
-            if c in user_message_lower:
-                color = c
-                break
+            colors = ["red", "blue", "green", "black", "white", "pink", "yellow", "orange", "purple", "brown", "grey",
+                      "silver", "gold"]
+            for token in doc:
+                if token.text in colors:
+                    color = token.text
+                    break
 
-        size_mapping = {
-            "xs": "XS", "extra small": "XS",
-            "s": "S", "small": "S",
-            "m": "M", "medium": "M",
-            "l": "L", "large": "L",
-            "xl": "XL", "x-large": "XL", "extra large": "XL",
-            "xxl": "XXL", "xx-large": "XXL",
-        }
-        for sz_key, sz_val in size_mapping.items():
-            if sz_key in user_message_lower:
-                size = sz_val
-                break
+            size_mapping = {
+                "xs": "XS", "extra small": "XS",
+                "s": "S", "small": "S",
+                "m": "M", "medium": "M",
+                "l": "L", "large": "L",
+                "xl": "XL", "x-large": "XL", "extra large": "XL",
+                "xxl": "XXL", "xx-large": "XXL",
+            }
+            for token in doc:
+                normalized_token = token.text.lower().replace('-', ' ')
+                if normalized_token in size_mapping:
+                    size = size_mapping[normalized_token]
+                    break
+        else: # Fallback to simple keyword search if spaCy is not loaded
+            # Re-implement simple keyword checks for product details
+            if any(keyword in user_message_lower for keyword in ["shoes", "shoe", "footwear", "sneakers", "boots"]):
+                main_category_preference = "shoes"
+            # ... (add other main_category_preference checks here as in your previous version)
+            elif any(keyword in user_message_lower for keyword in ["bags", "bag", "backpacks", "purse", "handbag"]):
+                main_category_preference = "bags"
+            elif any(keyword in user_message_lower for keyword in ["accessories", "accessory", "jewellery", "jewelry", "watches", "earrings", "necklace", "ring", "bracelet", "belt"]):
+                main_category_preference = "accessories"
+            elif any(keyword in user_message_lower for keyword in ["women's wear", "womens wear", "ladies wear", "women", "ladies", "female", "dresses", "skirts", "tops"]):
+                main_category_preference = "women_clothing"
+            elif any(keyword in user_message_lower for keyword in ["men's wear", "mens wear", "gent's wear", "gents wear", "men", "gents", "male", "shirts", "pants"]):
+                main_category_preference = "men_clothing"
+            elif any(keyword in user_message_lower for keyword in ["kid's wear", "kids wear", "children's wear", "kids", "children", "boys", "girls"]):
+                main_category_preference = "kid_clothing"
 
-        print(
-            f"Extracted: Main Category: {main_category_preference}, Item Type: {product_item_type}, Color: {color}, Size: {size}")
+            product_type_keywords = {
+                "dresses": "dress", "dress": "dress", "gown": "dress",
+                "t-shirts": "t-shirt", "tshirt": "t-shirt", "tee": "t-shirt",
+                "pants": "pant", "jeans": "jeans", "trouser": "pant",
+                "shirts": "shirt", "shirt": "shirt",
+                "top": "top", "tops": "top",
+                "jackets": "jacket", "jacket": "jacket", "coat": "jacket",
+                "skirts": "skirt", "skirt": "skirt",
+                "saree": "saree", "sarees": "saree", "sari": "saree",
+                "hoodie": "hoodie", "sweatshirt": "sweatshirt",
+                "shorts": "shorts", "leggings": "leggings", "trousers": "trousers",
+            }
+            for kw, val in product_type_keywords.items():
+                if kw in user_message_lower:
+                    product_item_type = val
+                    break
+
+            colors = ["red", "blue", "green", "black", "white", "pink", "yellow", "orange", "purple", "brown", "grey",
+                      "silver", "gold"]
+            for c in colors:
+                if c in user_message_lower:
+                    color = c
+                    break
+
+            size_mapping = {
+                "xs": "XS", "extra small": "XS",
+                "s": "S", "small": "S",
+                "m": "M", "medium": "M",
+                "l": "L", "large": "L",
+                "xl": "XL", "x-large": "XL", "extra large": "XL",
+                "xxl": "XXL", "xx-large": "XXL",
+            }
+            for sz_key, sz_val in size_mapping.items():
+                if sz_key in user_message_lower:
+                    size = sz_val
+                    break
+
+
+        print(f"Extracted: Main Category: {main_category_preference}, Item Type: {product_item_type}, Color: {color}, Size: {size}")
 
         products_query = Product.objects.filter(available=True)
         combined_filters = Q()
@@ -230,20 +415,23 @@ def _get_chatbot_response_logic(user_message_str):
             else:
                 combined_filters = size_q
 
-        if not combined_filters and user_message_lower:
-             combined_filters = (
+        # If no specific product, color, or size keywords were identified,
+        # but the general product search intent was predicted, use the full message
+        if not (main_category_preference or product_item_type or color or size):
+            combined_filters = (
                     Q(name__icontains=user_message_lower) |
                     Q(description__icontains=user_message_lower) |
                     Q(category__name__icontains=user_message_lower) |
                     Q(subcategory__name__icontains=user_message_lower)
             )
-        elif not combined_filters:
-            products_queryset = Product.objects.none()
+            # If the above still yields no filters, ensure it's not an empty Q() object later
+            # This is primarily for very general "show me products" type queries.
+            # For "red dress", it will have color and product_item_type.
 
-        if combined_filters:
+        products_queryset = Product.objects.none() # Initialize as empty to prevent error
+
+        if combined_filters: # Only apply filter if there's actually a filter to apply
             products_queryset = products_query.filter(combined_filters).distinct()
-        else:
-            products_queryset = Product.objects.none()
 
         print(f"DEBUG: Final Django Query for '{user_message_str}': {products_queryset.query}")
 
@@ -267,45 +455,66 @@ def _get_chatbot_response_logic(user_message_str):
             if specific_query_parts:
                 message = f"Sorry, I couldn't find any {' '.join(specific_query_parts)} at the moment. Please try a different term or browse our <a href='{reverse('shop:product_list')}' target='_parent'>Products page</a>."
             else:
-                message = "I couldn't find any products matching your request. What specific product or type of product are you looking for? For example, 'Show me dresses' or 'Do you have bags?'"
-            return message
+                # Fallback to generic product search response from JSON
+                for intent in intents:
+                    if intent['tag'] == 'product_search_query':
+                        return random.choice(intent['responses'])
+                # Ultimate fallback if 'product_search_query' intent somehow missing
+                return "I couldn't find any products matching your request. What specific product or type of product are you looking for?"
+
+    # --- General Intent Response Generation (for all other predicted_tags) ---
+    # This block will execute if predicted_tag is NOT 'product_search_query'
+    for intent in intents:
+        if intent['tag'] == predicted_tag:
+            response_template = random.choice(intent['responses'])
+
+            # Dictionary to map internal URL placeholders to Django reverse URLs
+            url_mappings = {
+                "/returns/": reverse('shop:faqs'), # Assuming your returns policy is part of FAQs
+                "/track-order/": reverse('shop:home'), # Placeholder, create a dedicated track order page if needed
+                "/contactus/": reverse('shop:contactus'),
+                "/products/": reverse('shop:product_list'),
+                "/about/": reverse('shop:home'), # Placeholder, create a dedicated about page
+                "/feedback/": reverse('shop:home'), # Placeholder, create a dedicated feedback page
+                "/shipping-info/": reverse('shop:faqs'), # Assuming shipping info is part of FAQs
+                "/promotions/": reverse('shop:home'), # Placeholder, create a dedicated promotions page
+                "/size-guide/": reverse('shop:faqs'), # Assuming size guide is part of FAQs
+                "/cart/": reverse('shop:home'), # Placeholder for cart page
+                "/register/": reverse('shop:signup'),
+                "/contactus/#complaint-form": reverse('shop:contactus'), # Direct to contact us
+                "/contactus/#suggestions": reverse('shop:contactus'), # Direct to contact us
+            }
+
+            # Apply general URL replacements first
+            for old_path, new_url in url_mappings.items():
+                response_template = response_template.replace(f"href='{old_path}'", f"href='{new_url}'")
+                response_template = response_template.replace(f"href=\"{old_path}\"", f"href=\"{new_url}\"")
 
 
-    if predicted_tag == "greeting":
-        return random.choice(["Hello!", "Hi there! How can I help you find fashion items today?"])
-    elif predicted_tag == "goodbye":
-        return random.choice(["Goodbye! Have a great day!", "See you soon!", "Bye!"])
-    elif predicted_tag == "thanks":
-        return random.choice(["You're welcome!", "Anytime!", "Glad to help!"])
-    elif predicted_tag == "contact_support_query":
-        return f"You can reach our support team via our <a href='{reverse('shop:contactus')}' target='_parent'>Contact Us page</a> or by email at {settings.EMAIL_HOST_USER}."
-    elif predicted_tag == "about_bot":
-        return "I am an AI chatbot designed to help you find products and navigate our fashion store. How can I assist you today?"
-    elif predicted_tag == "return_policy":
-        return "For information on returns and exchanges, please visit our <a href='{reverse('shop:faqs')}' target='_parent'>FAQs page</a> or our specific policy section."
-    elif predicted_tag == "shipping_info":
-        return "You can find details about our shipping and delivery options on our <a href='{reverse('shop:faqs')}' target='_parent'>FAQs page</a>."
-    elif predicted_tag == "payment_options":
-        return "We accept various payment methods, including credit/debit cards and other online payment options. You can see the full list during checkout."
+            # Specific replacements for dynamic content (email, phone, etc.)
+            if predicted_tag == "contact_support":
+                response_template = response_template.replace("support@eterna.com", settings.EMAIL_HOST_USER)
+                response_template = response_template.replace("9048376679", "9048376679") # Or from settings if applicable
+
+            return response_template
+
+    # Fallback if no intent (including 'fallback') was found or matched in the JSON
+    # This should ideally not be reached if 'fallback' intent is correctly defined.
+    return "I'm sorry, I couldn't find a suitable response. Could you please rephrase or ask about something else?"
 
 
-    return "I'm sorry, I couldn't find a suitable response. Please try again or rephrase your question."
-
-
-# --- Chatbot View --
+# --- Chatbot View (Handles HTTP requests and calls the helper function) ---
 @method_decorator(csrf_exempt, name='dispatch')
 @method_decorator(xframe_options_exempt, name='dispatch')
 class ChatbotView(View):
     def get(self, request):
-        return render(request, 'chatbot.html')
+        return render(request, 'chatbot.html') # Assuming you have a chatbot.html for the iframe itself
 
     def post(self, request):
         try:
-            # Data from the JavaScript AJAX POST request
             data = json.loads(request.body)
             user_message = data.get('message', '')
             print(f"SERVER: Received message from user: '{user_message}'")
-
 
             chatbot_response_text = _get_chatbot_response_logic(user_message)
 
@@ -321,7 +530,7 @@ class ChatbotView(View):
             return JsonResponse({'error': f'An internal server error occurred: {e}'}, status=500)
 
 
-
+# --- Existing Views (No changes below this point, they were already correct) ---
 class HomeView(View):
     def get(self, request):
         categories = Category.objects.prefetch_related('subcategories').all()
