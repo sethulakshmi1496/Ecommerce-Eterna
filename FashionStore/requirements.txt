@@ -8,3 +8,7 @@ setuptools>=65.5.0
 wheel>=0.42.0
 django-crispy-forms==2.1
 crispy-bootstrap5==2024.2
+razorpay==2.9.3
+whitenoise==6.7.0
+dj-database-url==2.1.0
+python-dotenv==1.0.1
