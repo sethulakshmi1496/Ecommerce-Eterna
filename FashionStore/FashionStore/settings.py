@@ -25,9 +25,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-wblnnx#3yn9^kmrn944)$(a@1j9tbtu6e2*9j!7jz6thc31=&b'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+import os
+
+# ... other settings ...
+
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True' # Default to False for safety
 
 ALLOWED_HOSTS = []
+if os.environ.get('DJANGO_ALLOWED_HOSTS'):
+    ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS').split(',')
+elif not DEBUG: # If DEBUG is False and ALLOWED_HOSTS is not set, this is a problem
+    # You might want to raise an error here to ensure it's always set
+    # raise Exception("DJANGO_ALLOWED_HOSTS environment variable must be set when DEBUG is False.")
+    pass # Or handle as appropriate
 
 
 # Application definition
