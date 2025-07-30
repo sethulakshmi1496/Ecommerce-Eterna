@@ -6,3 +6,5 @@ psycopg2-binary==2.9.6
 numpy==1.26.4
 setuptools>=65.5.0
 wheel>=0.42.0
+django-crispy-forms==2.1
+crispy-bootstrap5==2024.2
