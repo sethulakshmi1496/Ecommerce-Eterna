@@ -9,7 +9,7 @@ from django.core.mail import send_mail
 from django.db.models import Q
 from django.db.models import Count
 from django.urls import reverse
-from django.http import HttpResponse, JsonResponse # Ensure these are imported
+from django.http import HttpResponse, JsonResponse
 
 # Chatbot AI imports
 import json
@@ -20,111 +20,68 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
 
-# AI/NLP Libraries
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.svm import LinearSVC
-import spacy
 
 # Assuming your models are in .models
 from .models import Category, SubCategory, Product, CustomUser
 from .forms import SignupForm, LoginForm, CategoryForm, ProductForm
 
-# Load spaCy model globally (only once)
+# Load spaCy model globally
 nlp = None
-try:
-    nlp = spacy.load("en_core_web_sm")
-    print("spaCy model 'en_core_web_sm' loaded successfully.")
-except OSError:
-    print("spaCy model 'en_core_web_sm' not found. Please run 'python -m spacy download en_core_web_sm'")
 
-# --- Chatbot AI Model Training (Global Scope) ---
+
+# --- Chatbot AI Model Training (Global Scope)
 INTENTS_DATA_PATH = os.path.join(settings.BASE_DIR, 'shop', 'chatbot_intents.json')
 intents = []
 vectorizer = None
 clf = None
 
-try:
-    with open(INTENTS_DATA_PATH, 'r', encoding='utf-8') as f:
-        intents = json.load(f)
-    print(f"Chatbot intents loaded successfully from {INTENTS_DATA_PATH}. {len(intents)} intents found.")
 
-    training_sentences = []
-    training_labels = []
-    for intent in intents:
-        for pattern in intent['patterns']:
-            training_sentences.append(pattern.lower())
-            training_labels.append(intent['tag'])
-
-    if training_sentences:
-        vectorizer = TfidfVectorizer()
-        X_train = vectorizer.fit_transform(training_sentences)
-        clf = LinearSVC()
-        clf.fit(X_train, training_labels)
-        print("Chatbot intent model trained successfully.")
-    else:
-        print("WARNING: No training sentences found in intents data. Intent recognition will not work.")
-
-except FileNotFoundError:
-    print(f"ERROR: chatbot_intents.json not found at {INTENTS_DATA_PATH}. Chatbot intent recognition will be limited.")
-    intents = []
-except json.JSONDecodeError as e:
-    print(f"ERROR: Could not decode JSON from {INTENTS_DATA_PATH}. Check file format. Error: {e}")
-    intents = []
-except Exception as e:
-    print(f"ERROR: An unexpected error occurred during chatbot model loading/training: {e}")
-    import traceback
-    traceback.print_exc()
-
-# --- Chatbot Logic Helper Function (This now ONLY takes user_message as a string) ---
-def _get_chatbot_response_logic(user_message_str): # Renamed to private helper with underscore
+def _get_chatbot_response_logic(user_message_str):
     user_message_lower = user_message_str.lower().strip()
 
     predicted_tag = "fallback"
-    confidence_threshold = -0.5
 
-    if clf and vectorizer:
-        user_message_vectorized = vectorizer.transform([user_message_lower])
-        confidence_scores = clf.decision_function(user_message_vectorized)
-        max_score_index = confidence_scores[0].argmax()
-        highest_confidence = confidence_scores[0][max_score_index]
-        potential_tag = clf.classes_[max_score_index]
+    # Since clf and vectorizer are None, this 'else' block will always execute
+    print("WARNING: Chatbot model not loaded/trained. Falling back to simple keyword matching.")
+    if any(kw in user_message_lower for kw in ["hi", "hello", "hey"]):
+        predicted_tag = "greeting"
+    elif any(kw in user_message_lower for kw in ["bye", "goodbye", "see you"]):
+        predicted_tag = "goodbye"
+    elif any(kw in user_message_lower for kw in ["show me", "find product", "looking for", "products"]):
+        predicted_tag = "product_search_query"
+    elif any(kw in user_message_lower for kw in ["thank", "thanks"]):
+        predicted_tag = "thanks"
+    elif any(kw in user_message_lower for kw in ["contact", "support", "help"]):
+        predicted_tag = "contact_support_query"
+    elif any(kw in user_message_lower for kw in ["about you", "who are you"]):
+        predicted_tag = "about_bot"
+    elif any(kw in user_message_lower for kw in ["return", "exchange"]):
+        predicted_tag = "return_policy"
+    elif any(kw in user_message_lower for kw in ["delivery", "shipping"]):
+        predicted_tag = "shipping_info"
+    elif any(kw in user_message_lower for kw in ["payment", "pay"]):
+        predicted_tag = "payment_options"
 
-        print(f"DEBUG: Potential tag: {potential_tag}, Highest Confidence Score: {highest_confidence:.2f}")
 
-        if highest_confidence > confidence_threshold:
-            predicted_tag = potential_tag
-        else:
-            predicted_tag = "fallback"
-
-        print(f"Predicted intent after threshold: {predicted_tag} for message: '{user_message_lower}'")
-    else:
-        print("WARNING: Chatbot model not loaded/trained. Falling back to simple keyword matching.")
-        if any(kw in user_message_lower for kw in ["hi", "hello", "hey"]):
-            predicted_tag = "greeting"
-        elif any(kw in user_message_lower for kw in ["bye", "goodbye", "see you"]):
-            predicted_tag = "goodbye"
-        elif any(kw in user_message_lower for kw in ["show me", "find product", "looking for"]):
-            predicted_tag = "product_search_query"
-
-    if predicted_tag == "product_search_query" and nlp:
-        doc = nlp(user_message_lower)
+    if predicted_tag == "product_search_query":
         product_item_type = None
         color = None
         size = None
         main_category_preference = None
 
-        if any(keyword in user_message_lower for keyword in ["shoes", "shoe", "footwear"]):
+
+        if any(keyword in user_message_lower for keyword in ["shoes", "shoe", "footwear", "sneakers", "boots"]):
             main_category_preference = "shoes"
-        elif any(keyword in user_message_lower for keyword in ["bags", "bag", "backpacks", "purse"]):
+        elif any(keyword in user_message_lower for keyword in ["bags", "bag", "backpacks", "purse", "handbag"]):
             main_category_preference = "bags"
         elif any(keyword in user_message_lower for keyword in
-                 ["accessories", "accessory", "jewellery", "jewelry", "watches", "earrings", "necklace", "ring", "bracelet"]):
+                 ["accessories", "accessory", "jewellery", "jewelry", "watches", "earrings", "necklace", "ring", "bracelet", "belt"]):
             main_category_preference = "accessories"
         elif any(keyword in user_message_lower for keyword in
-                 ["women's wear", "womens wear", "ladies wear", "women", "ladies", "female"]):
+                 ["women's wear", "womens wear", "ladies wear", "women", "ladies", "female", "dresses", "skirts", "tops"]):
             main_category_preference = "women_clothing"
         elif any(keyword in user_message_lower for keyword in
-                 ["men's wear", "mens wear", "gent's wear", "gents wear", "men", "gents", "male"]):
+                 ["men's wear", "mens wear", "gent's wear", "gents wear", "men", "gents", "male", "shirts", "pants"]):
             main_category_preference = "men_clothing"
         elif any(keyword in user_message_lower for keyword in
                  ["kid's wear", "kids wear", "children's wear", "kids", "children", "boys", "girls"]):
@@ -142,22 +99,16 @@ def _get_chatbot_response_logic(user_message_str): # Renamed to private helper w
             "hoodie": "hoodie", "sweatshirt": "sweatshirt",
             "shorts": "shorts", "leggings": "leggings", "trousers": "trousers",
         }
-        for token in doc:
-            if token.text in product_type_keywords:
-                product_item_type = product_type_keywords[token.text]
-                break
-            elif token.lemma_ in product_type_keywords:
-                product_item_type = product_type_keywords[token.lemma_]
-                break
-            elif token.dep_ == 'dobj' and token.pos_ == 'NOUN' and token.text in product_type_keywords:
-                product_item_type = product_type_keywords[token.text]
+        for kw, val in product_type_keywords.items():
+            if kw in user_message_lower:
+                product_item_type = val
                 break
 
         colors = ["red", "blue", "green", "black", "white", "pink", "yellow", "orange", "purple", "brown", "grey",
                   "silver", "gold"]
-        for token in doc:
-            if token.text in colors:
-                color = token.text
+        for c in colors:
+            if c in user_message_lower:
+                color = c
                 break
 
         size_mapping = {
@@ -168,10 +119,9 @@ def _get_chatbot_response_logic(user_message_str): # Renamed to private helper w
             "xl": "XL", "x-large": "XL", "extra large": "XL",
             "xxl": "XXL", "xx-large": "XXL",
         }
-        for token in doc:
-            normalized_token = token.text.lower().replace('-', ' ')
-            if normalized_token in size_mapping:
-                size = size_mapping[normalized_token]
+        for sz_key, sz_val in size_mapping.items():
+            if sz_key in user_message_lower:
+                size = sz_val
                 break
 
         print(
@@ -306,7 +256,7 @@ def _get_chatbot_response_logic(user_message_str): # Renamed to private helper w
                 response_message += f"- <a href='{product_url}' target='_parent'>{p.name}</a> (₹{p.price})<br>"
             products_list_url = reverse('shop:product_list')
             response_message += f"<br>You can find more on our <a href='{products_list_url}' target='_parent'>Products page</a>."
-            return response_message # Returns string
+            return response_message
         else:
             specific_query_parts = []
             if main_category_preference: specific_query_parts.append(main_category_preference.replace("_clothing", ""))
@@ -318,23 +268,36 @@ def _get_chatbot_response_logic(user_message_str): # Renamed to private helper w
                 message = f"Sorry, I couldn't find any {' '.join(specific_query_parts)} at the moment. Please try a different term or browse our <a href='{reverse('shop:product_list')}' target='_parent'>Products page</a>."
             else:
                 message = "I couldn't find any products matching your request. What specific product or type of product are you looking for? For example, 'Show me dresses' or 'Do you have bags?'"
-            return message # Returns string
+            return message
 
-    for intent in intents:
-        if intent['tag'] == predicted_tag:
-            return random.choice(intent['responses']) # Returns string
+
+    if predicted_tag == "greeting":
+        return random.choice(["Hello!", "Hi there! How can I help you find fashion items today?"])
+    elif predicted_tag == "goodbye":
+        return random.choice(["Goodbye! Have a great day!", "See you soon!", "Bye!"])
+    elif predicted_tag == "thanks":
+        return random.choice(["You're welcome!", "Anytime!", "Glad to help!"])
+    elif predicted_tag == "contact_support_query":
+        return f"You can reach our support team via our <a href='{reverse('shop:contactus')}' target='_parent'>Contact Us page</a> or by email at {settings.EMAIL_HOST_USER}."
+    elif predicted_tag == "about_bot":
+        return "I am an AI chatbot designed to help you find products and navigate our fashion store. How can I assist you today?"
+    elif predicted_tag == "return_policy":
+        return "For information on returns and exchanges, please visit our <a href='{reverse('shop:faqs')}' target='_parent'>FAQs page</a> or our specific policy section."
+    elif predicted_tag == "shipping_info":
+        return "You can find details about our shipping and delivery options on our <a href='{reverse('shop:faqs')}' target='_parent'>FAQs page</a>."
+    elif predicted_tag == "payment_options":
+        return "We accept various payment methods, including credit/debit cards and other online payment options. You can see the full list during checkout."
+
 
     return "I'm sorry, I couldn't find a suitable response. Please try again or rephrase your question."
 
 
-# --- Chatbot View (Handles HTTP requests and calls the helper function) ---
+# --- Chatbot View --
 @method_decorator(csrf_exempt, name='dispatch')
 @method_decorator(xframe_options_exempt, name='dispatch')
 class ChatbotView(View):
     def get(self, request):
-        # This is for the initial load of the iframe.
-        # It's better to render a small HTML file with your chat interface.
-        return render(request, 'chatbot.html') # Assuming you have a chatbot.html for the iframe itself
+        return render(request, 'chatbot.html')
 
     def post(self, request):
         try:
@@ -343,7 +306,7 @@ class ChatbotView(View):
             user_message = data.get('message', '')
             print(f"SERVER: Received message from user: '{user_message}'")
 
-            # Call the helper function to get the chatbot's string response
+
             chatbot_response_text = _get_chatbot_response_logic(user_message)
 
             print(f"SERVER: Chatbot response: '{chatbot_response_text}'")
@@ -358,7 +321,7 @@ class ChatbotView(View):
             return JsonResponse({'error': f'An internal server error occurred: {e}'}, status=500)
 
 
-# --- Existing Views ---
+
 class HomeView(View):
     def get(self, request):
         categories = Category.objects.prefetch_related('subcategories').all()
