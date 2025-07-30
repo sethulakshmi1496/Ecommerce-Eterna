@@ -1,4 +1,4 @@
-jango==4.2.0
+django==4.2.0
 Pillow==10.4.0
 requests==2.31.0
 gunicorn==20.1.0
