@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+    <div class="container-fluid bg-secondary mb-5">
+        <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 300px">
+            <h1 class="font-weight-semi-bold text-uppercase mb-3">
+                {% if current_subcategory %}
+                    {{ current_subcategory.name }} Products
+                {% elif current_category %}
+                    {{ current_category.name }} Products
+                {% else %}
+                    Our Shop
+                {% endif %}
+            </h1>
+            <div class="d-inline-flex">
+                <p class="m-0"><a href="{% url 'shop:home' %}">Home</a></p>
+                <p class="m-0 px-2">-</p>
+                <p class="m-0">Shop</p>
+                {% if current_category %}
+                    <p class="m-0 px-2">-</p>
+                    <p class="m-0"><a href="{% url 'shop:products_by_category' current_category.id %}">{{ current_category.name }}</a></p>
+                {% endif %}
+                {% if current_subcategory %}
+                    <p class="m-0 px-2">-</p>
+                    <p class="m-0">{{ current_subcategory.name }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid pt-5">
+        <div class="row px-xl-5">
+            <div class="col-lg-3 col-md-12">
+                <form id="filter-form" method="get" action="{% url 'shop:product_list' %}">
+                    {# Preserve current category/subcategory in hidden fields for other filters #}
+                    {% if request.GET.category_id %}<input type="hidden" name="category_id" value="{{ request.GET.category_id }}">{% endif %}
+                    {% if request.GET.subcategory_id %}<input type="hidden" name="subcategory_id" value="{{ request.GET.subcategory_id }}">{% endif %}
+                    {% if request.GET.q %}<input type="hidden" name="q" value="{{ request.GET.q }}">{% endif %}
+                    {# The sort_by will be handled by JS now, so no hidden field here #}
+
+                    <div class="border-bottom mb-4 pb-4">
+                        <h5 class="font-weight-semi-bold mb-4">Filter by price</h5>
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="price_range" id="price-all" value="" {% if not request.GET.price_range %}checked{% endif %}>
+                            <label class="custom-control-label" for="price-all">All Price</label>
+                            <span class="badge border font-weight-normal">{{ total_products_count|default:0 }}</span>
+                        </div>
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="price_range" id="price-1" value="500-1000" {% if request.GET.price_range == '500-1000' %}checked{% endif %}>
+                            <label class="custom-control-label" for="price-1">₹500 - ₹1000</label>
+                            <span class="badge border font-weight-normal">7</span>
+                        </div>
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="price_range" id="price-2" value="1001-2000" {% if request.GET.price_range == '1001-2000' %}checked{% endif %}>
+                            <label class="custom-control-label" for="price-2">₹1001 - ₹2000</label>
+                            <span class="badge border font-weight-normal">4</span>
+                        </div>
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="price_range" id="price-3" value="2001-3000" {% if request.GET.price_range == '2001-3000' %}checked{% endif %}>
+                            <label class="custom-control-label" for="price-3">₹2001 - ₹3000</label>
+                            <span class="badge border font-weight-normal">22</span>
+                        </div>
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="price_range" id="price-4" value="3001-4000" {% if request.GET.price_range == '3001-4000' %}checked{% endif %}>
+                            <label class="custom-control-label" for="price-4">₹3001 - ₹4000</label>
+                            <span class="badge border font-weight-normal">14</span>
+                        </div>
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between">
+                            <input type="radio" class="custom-control-input" name="price_range" id="price-5" value="4001-5000" {% if request.GET.price_range == '4001-5000' %}checked{% endif %}>
+                            <label class="custom-control-label" for="price-5">₹4001 - ₹5000</label>
+                            <span class="badge border font-weight-normal">8</span>
+                        </div>
+                    </div>
+                    <div class="border-bottom mb-4 pb-4">
+                        <h5 class="font-weight-semi-bold mb-4">Filter by Categories</h5>
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="category_id" id="category-all" value="" {% if not request.GET.category_id and not request.GET.subcategory_id %}checked{% endif %}>
+                            <label class="custom-control-label" for="category-all">All Categories</label>
+                            <span class="badge border font-weight-normal">
+                                {{ total_products_count|default:0 }}
+                            </span>
+                        </div>
+                        {% for cat in all_categories %}
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="category_id" id="category-{{ cat.id }}" value="{{ cat.id }}" {% if request.GET.category_id|floatformat == cat.id|floatformat %}checked{% endif %}>
+                            <label class="custom-control-label" for="category-{{ cat.id }}">{{ cat.name }}</label>
+                            <span class="badge border font-weight-normal">
+                                {{ cat.product_count|default:0 }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="border-bottom mb-4 pb-4">
+                        <h5 class="font-weight-semi-bold mb-4">Filter by color</h5>
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="color" id="color-all" value="" {% if not request.GET.color %}checked{% endif %}>
+                            <label class="custom-control-label" for="color-all">All Color</label>
+                            <span class="badge border font-weight-normal">
+                                {# This count is for all products, you might want filtered count #}
+                                {{ total_products_count|default:0 }}
+                            </span>
+                        </div>
+                        {% for color_option in available_colors %}
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="color" id="color-{{ color_option|slugify }}" value="{{ color_option }}" {% if request.GET.color == color_option %}checked{% endif %}>
+                            <label class="custom-control-label" for="color-{{ color_option|slugify }}">{{ color_option }}</label>
+                            {# Dynamic counts per color would require more complex context data #}
+                            <span class="badge border font-weight-normal">?</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-5">
+                        <h5 class="font-weight-semi-bold mb-4">Filter by size</h5>
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="size" id="size-all" value="" {% if not request.GET.size %}checked{% endif %}>
+                            <label class="custom-control-label" for="size-all">All Size</label>
+                            <span class="badge border font-weight-normal">
+                                {{ total_products_count|default:0 }}
+                            </span>
+                        </div>
+                        {% for size_option in available_sizes %}
+                        <div class="custom-control custom-checkbox d-flex align-items-center justify-content-between mb-3">
+                            <input type="radio" class="custom-control-input" name="size" id="size-{{ size_option|slugify }}" value="{{ size_option }}" {% if request.GET.size == size_option %}checked{% endif %}>
+                            <label class="custom-control-label" for="size-{{ size_option|slugify }}">{{ size_option }}</label>
+                            {# Dynamic counts per size would require more complex context data #}
+                            <span class="badge border font-weight-normal">?</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Apply Filters</button>
+                </form>
+                </div>
+
+            <div class="col-lg-9 col-md-12">
+                <div class="row pb-3">
+                    <div class="col-12 pb-1">
+                        <div class="d-flex align-items-center justify-content-between mb-4">
+                            <form action="{% url 'shop:product_list' %}" method="get">
+                                <div class="input-group">
+                                    <input type="text" class="form-control" placeholder="Search by name" name="q" value="{{ request.GET.q|default:'' }}">
+                                    <div class="input-group-append">
+                                        <button type="submit" class="input-group-text bg-transparent text-primary">
+                                            <i class="fa fa-search"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                            <div class="dropdown ml-4">
+                                <button class="btn border dropdown-toggle" type="button" id="triggerId" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                    Sort by {{ request.GET.sort_by|default:"Latest"|title }}
+                                </button>
+                                <div class="dropdown-menu dropdown-menu-right" aria-labelledby="triggerId">
+                                    <a class="dropdown-item sort-option" href="#" data-sort-by="latest">Latest</a>
+                                    <a class="dropdown-item sort-option" href="#" data-sort-by="popularity">Popularity</a>
+                                    <a class="dropdown-item sort-option" href="#" data-sort-by="price_asc">Price: Low to High</a>
+                                    <a class="dropdown-item sort-option" href="#" data-sort-by="price_desc">Price: High to Low</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% for product in products %}
+                    <div class="col-lg-4 col-md-6 col-sm-12 pb-1">
+                        <div class="card product-item border-0 mb-4">
+                            <div class="card-header product-img position-relative overflow-hidden bg-transparent border p-0">
+                                {% if product.image %}
+                                    <img class="img-fluid w-100" src="{{ product.image.url }}" alt="{{ product.name }}">
+                                {% else %}
+                                    <img class="img-fluid w-100" src="{% static 'img/product-placeholder.jpg' %}" alt="No image available">
+                                {% endif %}
+                            </div>
+                            <div class="card-body border-left border-right text-center p-0 pt-4 pb-3">
+                                <h6 class="text-truncate mb-3">{{ product.name }}</h6>
+                                <div class="d-flex justify-content-center">
+                                    <h6>₹{{ product.price|floatformat:2 }}</h6>
+                                </div>
+                            </div>
+                            <div class="card-footer d-flex justify-content-between bg-light border">
+                                <a href="{% url 'shop:productdetail' product.id %}" class="btn btn-sm text-dark p-0"><i class="fas fa-eye text-primary mr-1"></i>View Detail</a>
+                                <a href="{% url 'cart:addtocart' product.id %}" class="btn btn-sm text-dark p-0"><i class="fas fa-shopping-cart text-primary mr-1"></i>Add To Cart</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-center">
+                        <p>No products found matching your criteria.</p>
+                    </div>
+                    {% endfor %}
+                    <div class="col-12 pb-1">
+                        <nav aria-label="Page navigation">
+                            <ul class="pagination justify-content-center mb-3">
+                                {% if products.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ products.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Previous">
+                                        <span aria-hidden="true">&laquo;</span>
+                                        <span class="sr-only">Previous</span>
+                                    </a>
+                                </li>
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" aria-label="Previous">
+                                        <span aria-hidden="true">&laquo;</span>
+                                        <span class="sr-only">Previous</span>
+                                    </a>
+                                </li>
+                                {% endif %}
+
+                                {% for num in products.paginator.page_range %}
+                                <li class="page-item {% if products.number == num %}active{% endif %}">
+                                    <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                                </li>
+                                {% endfor %}
+
+                                {% if products.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ products.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="Next">
+                                        <span aria-hidden="true">&raquo;</span>
+                                        <span class="sr-only">Next</span>
+                                    </a>
+                                </li>
+                                {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" aria-label="Next">
+                                        <span aria-hidden="true">&raquo;</span>
+                                        <span class="sr-only">Next</span>
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block custom_js %}
+<script>
+    $(document).ready(function() {
+        // --- JavaScript for Filter Radio Buttons ---
+        $('#filter-form input[type="radio"]').on('change', function() {
+            const form = $(this).closest('form');
+            const currentUrl = new URL(window.location.href);
+
+            // Clear 'page' and 'sort_by' parameters to ensure fresh filtering
+            currentUrl.searchParams.delete('page');
+            currentUrl.searchParams.delete('sort_by'); // Also reset sort when applying new filters
+
+            // Reconstruct URL with current form inputs (price, color, size, category, subcategory, search)
+            const formData = new FormData(form[0]);
+            let newSearchParams = new URLSearchParams();
+            for (let pair of formData.entries()) {
+                if (pair[1] !== '') { // Only add if value is not empty
+                    newSearchParams.append(pair[0], pair[1]);
+                }
+            }
+
+            // Append any parameters from the original URL that were NOT part of the filter form
+            // (e.g., if a category_id came from the URL path initially)
+            // This needs careful handling, for now the hidden inputs in the form handle this for categories/subcategories.
+            // If other path-based params need preservation, extract them first.
+            const urlPath = window.location.pathname.split('/').filter(Boolean); // Get path segments
+            let baseUrl = '{% url "shop:product_list" %}'; // Default to product list URL
+            if (urlPath[0] === 'products' && urlPath.length > 1) {
+                // If it's a category/subcategory URL, ensure it's kept
+                if (urlPath[1] === 'category' && urlPath.length > 2) {
+                    baseUrl = `/products/category/${urlPath[2]}/`; // Reconstruct category URL
+                } else if (urlPath[1] === 'subcategory' && urlPath.length > 2) {
+                    baseUrl = `/products/subcategory/${urlPath[2]}/`; // Reconstruct subcategory URL
+                }
+            }
+
+
+            window.location.href = `${baseUrl}?${newSearchParams.toString()}`;
+        });
+
+
+        // --- JavaScript for Sorting Dropdown Links ---
+        $('.sort-option').on('click', function(e) {
+            e.preventDefault(); // Prevent the default link behavior
+
+            const sortByValue = $(this).data('sort-by'); // Get the sort_by value from data-sort-by
+
+            const currentUrl = new URL(window.location.href);
+
+            // Remove existing 'sort_by' parameter
+            currentUrl.searchParams.delete('sort_by');
+            // Remove 'page' parameter to reset pagination when sorting
+            currentUrl.searchParams.delete('page');
+
+            // Add the new 'sort_by' parameter
+            currentUrl.searchParams.append('sort_by', sortByValue);
+
+            // Navigate to the new URL
+            window.location.href = currentUrl.toString();
+        });
+
+        // --- Keep the current sort option displayed in the button ---
+        // This is already handled by {{ request.GET.sort_by|default:"Latest"|title }}
+        // No additional JS needed for this part.
+    });
+</script>
+{% endblock custom_js %}

@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+    <div class="container-fluid bg-secondary mb-5">
+        <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 300px">
+            <h1 class="font-weight-semi-bold text-uppercase mb-3">Help Center</h1>
+            <div class="d-inline-flex align-items-center">
+                <p class="m-0"><a href="{% url 'shop:home' %}">Home</a></p>
+                <p class="m-0 px-2">-</p>
+                <p class="m-0">Help</p>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid pt-5">
+        <div class="row px-xl-5">
+            <div class="col-lg-10 offset-lg-1"> {# Centering the content with offset #}
+                <h2 class="font-weight-semi-bold mb-4">How Can We Help You Today?</h2>
+
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-shipping-fast fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title font-weight-bold mb-3">Shipping & Delivery</h5>
+                                <p class="card-text">Find information about our shipping options, delivery times, and order tracking.</p>
+                                <a href="{% url 'shop:faqs' %}" class="btn btn-outline-primary btn-sm mt-2">Learn More</a> {# Linking to FAQs for details #}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-undo-alt fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title font-weight-bold mb-3">Returns & Refunds</h5>
+                                <p class="card-text">Understand our return policy, how to initiate a return, and refund processing.</p>
+                                <a href="{% url 'shop:faqs' %}" class="btn btn-outline-primary btn-sm mt-2">Learn More</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-credit-card fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title font-weight-bold mb-3">Payment & Billing</h5>
+                                <p class="card-text">Details on accepted payment methods, billing issues, and secure transactions.</p>
+                                <a href="{% url 'shop:faqs' %}" class="btn btn-outline-primary btn-sm mt-2">Learn More</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-user-circle fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title font-weight-bold mb-3">Account Management</h5>
+                                <p class="card-text">Help with creating an account, password reset, and managing your profile.</p>
+                                <a href="{% url 'shop:faqs' %}" class="btn btn-outline-primary btn-sm mt-2">Learn More</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-tshirt fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title font-weight-bold mb-3">Product Information</h5>
+                                <p class="card-text">Assistance with product details, sizing guides, and care instructions.</p>
+                                <a href="{% url 'shop:product_list' %}" class="btn btn-outline-primary btn-sm mt-2">View Products</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card h-100 border-0 shadow-sm">
+                            <div class="card-body text-center">
+                                <i class="fas fa-question-circle fa-3x text-primary mb-3"></i>
+                                <h5 class="card-title font-weight-bold mb-3">General Questions</h5>
+                                <p class="card-text">For all other inquiries not covered in specific categories, check our FAQs.</p>
+                                <a href="{% url 'shop:faqs' %}" class="btn btn-outline-primary btn-sm mt-2">Go to FAQs</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="my-5">
+
+                <h3 class="font-weight-semi-bold mb-4 text-center">Still Need Help?</h3>
+                <div class="text-center mb-5">
+                    <p class="lead mb-4">Our dedicated support team is here to assist you.</p>
+                    <a href="{% url 'shop:contactus' %}" class="btn btn-primary btn-lg"><i class="fas fa-headset mr-2"></i> Contact Support</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endblock content %}

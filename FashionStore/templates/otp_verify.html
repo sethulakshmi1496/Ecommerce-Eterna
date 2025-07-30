@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+
+<div class="container w-50 border border-1 border-dark mt-5 mb-5 p-5">
+  <form method="POST">
+
+      {% csrf_token %}
+       <input type="text" name="otp">
+  <input type="submit">
+</form>
+
+    {% if messages %}
+{% for m in messages %}
+{{m}}
+{% endfor %}
+{% endif %}
+
+</div>
+
+{% endblock %}

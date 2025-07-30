@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% load static %}
+
+{% block content %}
+
+    <div class="container-fluid bg-secondary mb-5">
+        <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 300px">
+            <h1 class="font-weight-semi-bold text-uppercase mb-3">Checkout</h1>
+            <div class="d-inline-flex">
+                <p class="m-0"><a href="{% url 'shop:home' %}">Home</a></p>
+                <p class="m-0 px-2">-</p>
+                <p class="m-0">Checkout</p>
+            </div>
+        </div>
+    </div>
+    <div class="cart-box-main">
+        <div class="container">
+            <div class="row">
+                <div class="col-sm-6 col-lg-6 mb-3">
+                    <div class="checkout-address">
+                        <div class="title-left">
+                            <h3>Billing Address</h3>
+                        </div>
+                        <div class="container w-80 border border-2  border-dark px-5 pb-5 pt-5 mt-5">
+                            <form method="post">
+                                {% csrf_token %}
+                                {{ form|crispy }}
+                                <button type="submit" class="btn hvr-hover">Proceed to Payment</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-6 mb-3">
+                    <div class="row">
+                        <div class="col-md-12 col-lg-12">
+                            <div class="shipping-method-box">
+                                <div class="title-left">
+                                    <h3>Shipping Method</h3>
+                                </div>
+                                <div class="mb-4">
+                                    <div class="custom-control custom-radio">
+                                        <input id="shippingOption1" name="shipping-option" class="custom-control-input" checked type="radio" value="standard" data-price="0.00">
+                                        <label class="custom-control-label" for="shippingOption1">Standard Delivery</label> <span class="float-right font-weight-bold">FREE</span> </div>
+                                    <div class="ml-4 mb-2 small">(3-7 business days)</div>
+                                    <div class="custom-control custom-radio">
+                                        <input id="shippingOption2" name="shipping-option" class="custom-control-input" type="radio" value="express" data-price="10.00">
+                                        <label class="custom-control-label" for="shippingOption2">Express Delivery</label> <span class="float-right font-weight-bold">$10.00</span> </div>
+                                    <div class="ml-4 mb-2 small">(2-4 business days)</div>
+                                    <div class="custom-control custom-radio">
+                                        <input id="shippingOption3" name="shipping-option" class="custom-control-input" type="radio" value="next_day" data-price="20.00">
+                                        <label class="custom-control-label" for="shippingOption3">Next Business day</label> <span class="float-right font-weight-bold">$20.00</span> </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12 col-lg-12">
+                            <div class="odr-box">
+                                <div class="title-left">
+                                    <h3>Shopping cart</h3>
+                                </div>
+                                <div class="rounded p-2 bg-light">
+                                    {% if cart %}
+                                        {% for item in cart %}
+                                            <div class="media mb-2 {% if not forloop.last %}border-bottom{% endif %}">
+                                                <div class="media-body">
+                                                    <a href="{% url 'shop:productdetail' item.product.id %}">{{ item.product.name }}</a>
+                                                    <div class="small text-muted">
+                                                        Price: ${{ item.product.price|floatformat:2 }}
+                                                        <span class="mx-2">|</span>
+                                                        Qty: {{ item.quantity }}
+                                                        <span class="mx-2">|</span>
+                                                        Subtotal: ${{ item.subtotal|floatformat:2 }}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <p class="text-center">Your cart is empty.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-12 col-lg-12">
+                            <div class="order-box">
+                                <div class="title-left">
+                                    <h3>Your order</h3>
+                                </div>
+                                <div class="d-flex">
+                                    <div class="font-weight-bold">Product</div>
+                                    <div class="ml-auto font-weight-bold">Total</div>
+                                </div>
+                                <hr class="my-1">
+                                <div class="d-flex">
+                                    <h4>Sub Total</h4>
+                                    <div class="ml-auto font-weight-bold" id="subTotalDisplay"> ${{ total|floatformat:2 }} </div>
+                                </div>
+                                <div class="d-flex">
+                                    <h4>Discount</h4>
+                                    <div class="ml-auto font-weight-bold"> $ 0.00 </div>
+                                </div>
+                                <hr class="my-1">
+                                <div class="d-flex">
+                                    <h4>Coupon Discount</h4>
+                                    <div class="ml-auto font-weight-bold"> $ 0.00 </div>
+                                </div>
+                                <div class="d-flex">
+                                    <h4>Tax</h4>
+                                    <div class="ml-auto font-weight-bold"> $ 0.00 </div>
+                                </div>
+                                <div class="d-flex">
+                                    <h4>Shipping Cost</h4>
+                                    <div class="ml-auto font-weight-bold" id="shippingCostDisplay"> Free </div>
+                                </div>
+                                <hr>
+                                <div class="d-flex gr-total">
+                                    <h5>Grand Total</h5>
+                                    <div class="ml-auto h5" id="grandTotalDisplay"> ${{ total|floatformat:2 }} </div>
+                                </div>
+                                <hr>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const shippingOptions = document.querySelectorAll('input[name="shipping-option"]');
+            const subTotalDisplay = document.getElementById('subTotalDisplay');
+            const shippingCostDisplay = document.getElementById('shippingCostDisplay');
+            const grandTotalDisplay = document.getElementById('grandTotalDisplay');
+
+            // Get initial subtotal from the rendered HTML
+            // We need to parse it to a number.
+            // Ensure the 'total' variable is correctly passed from your Django view.
+            const initialSubTotalText = subTotalDisplay.textContent.replace('$', '').trim();
+            let subTotal = parseFloat(initialSubTotalText) || 0;
+
+            // Function to update totals
+            function updateTotals() {
+                let selectedShippingCost = 0;
+                let shippingText = "Free";
+
+                // Find the selected radio button
+                for (const option of shippingOptions) {
+                    if (option.checked) {
+                        selectedShippingCost = parseFloat(option.dataset.price);
+                        if (selectedShippingCost > 0) {
+                            shippingText = '$' + selectedShippingCost.toFixed(2);
+                        } else {
+                            shippingText = 'Free';
+                        }
+                        break;
+                    }
+                }
+
+                const grandTotal = subTotal + selectedShippingCost;
+
+                shippingCostDisplay.textContent = shippingText;
+                grandTotalDisplay.textContent = '$' + grandTotal.toFixed(2);
+            }
+
+            // Add event listeners to shipping options
+            shippingOptions.forEach(option => {
+                option.addEventListener('change', updateTotals);
+            });
+
+            // Initial calculation when the page loads
+            updateTotals();
+        });
+    </script>
+
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+ <div class="container-fluid bg-secondary mb-5">
+        <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 300px">
+            <h1 class="font-weight-semi-bold text-uppercase mb-3"> Your Orders</h1>
+            <div class="d-inline-flex">
+                <p class="m-0"><a href="{% url 'shop:home' %}">Home</a></p>
+                <p class="m-0 px-2">-</p>
+                <p class="m-0">your orders</p>
+            </div>
+        </div>
+    </div>
+
+<h2 class="text-center">Name of Customer:{{user.username}}</h2>
+
+{% for i in orders %}
+    {% for j in i.items.all %}
+
+<div class="card mb-3 mx-auto mt-5" style="max-width: 540px;">
+  <div class="row g-0">
+    <div class="col-md-4">
+      <img src="{{j.product.image.url}}" class="img-fluid rounded-start" alt="...">
+    </div>
+    <div class="col-md-8">
+      <div class="card-body">
+        <h5 class="card-title">Product_name:{{j.product.name.}}</h5>
+        <p class="card-text">Price:{{j.product.price}}</p>
+          <p class="card-text">No_of_items:{{j.quantity}}</p>
+          <p class="card-text">Order_id:{{i.order_id}}</p>
+         <p class="card-text">Ordered_on:{{i.ordered_date}}</p>
+        <p class="card-text">Delivered_status:{{i.delivery_status}}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endfor %}
+{% endfor %}
+
+
+{% endblock %}

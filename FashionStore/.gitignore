@@ -1,0 +1,18 @@
+# Environment variables file
+.env
+
+# SQLite database file
+db.sqlite3
+
+# Python virtual environment
+.venv/
+venv/
+
+# PyCharm specific files
+.idea/
+*.iml
+
+# Compiled Python files
+__pycache__/
+*.pyc
+*.pyo

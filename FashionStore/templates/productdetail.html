@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+
+    <div class="container-fluid bg-secondary mb-5">
+        <div class="d-flex flex-column align-items-center justify-content-center" style="min-height: 300px">
+            <h1 class="font-weight-semi-bold text-uppercase mb-3">Product Detail</h1>
+            <div class="d-inline-flex">
+                <p class="m-0"><a href="{% url 'shop:home' %}">Home</a></p>
+                <p class="m-0 px-2">-</p>
+                <p class="m-0"><a href="{% url 'shop:product_list' %}">Shop</a></p>
+                <p class="m-0 px-2">-</p>
+                <p class="m-0">{{ product.name|truncatechars:30 }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid py-5">
+        <div class="row px-xl-5">
+            <div class="col-lg-5 pb-5">
+                {% if product.image %}
+                    <img class="img-fluid w-100" src="{{ product.image.url }}" alt="{{ product.name }}">
+                {% else %}
+                    <img class="img-fluid w-100" src="{% static 'img/product-placeholder.jpg' %}" alt="No image available">
+                {% endif %}
+            </div>
+
+            <div class="col-lg-7 pb-5">
+                <div class="single-product-details">
+                    <h2>{{product.name}}</h2>
+                    <h5>₹{{product.price|floatformat:2}}</h5>
+                    <p class="available-stock"><span> {{product.stock}} items available</span></p>
+
+                    {% if product.color %}
+                    <p><strong>Color:</strong> {{ product.color }}</p>
+                    {% endif %}
+                    {% if product.size %}
+                    <p><strong>Size:</strong> {{ product.size }}</p>
+                    {% endif %}
+
+                    <h4>Short Description:</h4>
+                    <p style="text-align:justify;">{{product.description}} </p>
+
+                    <div class="price-box-bar">
+                        <div class="cart-and-bay-btn">
+                            {# If "Buy Now" has a separate quick checkout logic, link it here #}
+                            <a class="btn hvr-hover" href="{% url 'cart:addtocart' product.id %}?quantity=1">Buy Now</a>
+                            <a class="btn hvr-hover" href="{% url 'cart:addtocart' product.id %}">Add to cart</a>
+                               <a class="btn hvr-hover" href="{% url 'cart:add_to_favorites' product.id %}">
+                                <i class="far fa-heart"></i> Add to Favorite
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-fluid py-5">
+        <div class="row px-xl-5">
+            <div class="col">
+                <div class="nav nav-tabs justify-content-center border-secondary mb-4">
+                    <a class="nav-item nav-link active" data-toggle="tab" href="#tab-pane-1">Description</a>
+                    <a class="nav-item nav-link" data-toggle="tab" href="#tab-pane-2">Information</a>
+                    <a class="nav-item nav-link" data-toggle="tab" href="#tab-pane-3">Reviews (0)</a>
+                </div>
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="tab-pane-1">
+                        <h4 class="mb-3">Product Description</h4>
+                        <p style="text-align:justify;">{{ product.description|safe }}</p>
+                    </div>
+                    <div class="tab-pane fade" id="tab-pane-2">
+                        <h4 class="mb-3">Additional Information</h4>
+                        <p>Additional product details or specifications go here.</p>
+                        {% if product.color %}<p><strong>Color:</strong> {{ product.color }}</p>{% endif %}
+                        {% if product.size %}<p><strong>Size:</strong> {{ product.size }}</p>{% endif %}
+                        <p><strong>Stock:</strong> {{ product.stock }}</p>
+                        <p><strong>Category:</strong> {{ product.category.name }}</p>
+                        {% if product.subcategory %}<p><strong>Subcategory:</strong> {{ product.subcategory.name }}</p>{% endif %}
+                    </div>
+                    <div class="tab-pane fade" id="tab-pane-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h4 class="mb-4">Reviews</h4>
+                                <p>No reviews yet.</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h4 class="mb-4">Leave a review</h4>
+                                <form>
+                                    <div class="form-group">
+                                        <label for="message">Your Review *</label>
+                                        <textarea id="message" cols="30" rows="5" class="form-control"></textarea>
+                                    </div>
+                                    <input type="submit" value="Leave Your Review" class="btn btn-primary px-3">
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

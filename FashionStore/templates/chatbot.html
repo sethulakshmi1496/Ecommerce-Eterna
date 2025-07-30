@@ -1,0 +1,217 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eterna Fashion Bot</title>
+
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
+    <style>
+        /* Your existing custom CSS for the chat interface */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Poppins', sans-serif;
+        }
+        .container {
+            flex-grow: 1;
+            padding: 10px !important;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 100%;
+        }
+        .card {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            border: none;
+            box-shadow: none;
+        }
+        .card-body {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .chat-message {
+            max-width: 75%;
+            padding: 10px 15px;
+            border-radius: 20px;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background-color: #D19C97; /* Eterna categories/logo color */
+            color: white; /* Keep white for contrast */
+            align-self: flex-end;
+            border-bottom-right-radius: 5px;
+        }
+        .bot-message {
+            background-color: #F5F5F5; /* Lighter grey for bot messages */
+            color: #333; /* Darker text for readability */
+            align-self: flex-start;
+            border-bottom-left-radius: 5px;
+        }
+        .bot-message a {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+        /* Chat header and Send button to match Eterna color */
+        .card-header,
+        .card-footer .input-group .btn {
+            background-color: #D19C97; /* Eterna categories/logo color */
+            color: white; /* Ensure text is white for contrast */
+            border-color: #D19C97; /* Match border color */
+        }
+        .card-footer {
+            flex-shrink: 0;
+            padding: 10px;
+            background-color: #f8f9fa; /* Keep footer background light */
+        }
+        .card-footer .input-group .form-control {
+            border-top-left-radius: .25rem;
+            border-bottom-left-radius: .25rem;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+        .card-footer .input-group .btn {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+            border-top-right-radius: .25rem;
+            border-bottom-right-radius: .25rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container h-100">
+        <div class="row justify-content-center h-100">
+            <div class="col-12 h-100">
+                <div class="card h-100">
+                    <div class="card-header text-white text-center py-2">
+                        <h5 class="mb-0">Chat with us!</h5>
+                    </div>
+                    <div class="card-body" id="chat-box">
+                        <div class="chat-message bot-message">
+                            Hello! I'm Eterna Fashion Bot. How can I help you today? ✨
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        <div class="input-group">
+                            <input type="text" id="user-input" class="form-control form-control-lg" placeholder="Type your message..." autofocus>
+                            <div class="input-group-append">
+                                <button class="btn btn-primary btn-lg" id="send-button">Send <i class="fas fa-paper-plane"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            console.log("CHATBOT_IFRAME: Document ready. Chatbot script initialized.");
+
+            const chatBox = $('#chat-box');
+            const userInput = $('#user-input');
+            const sendButton = $('#send-button');
+
+            if (chatBox.length) { console.log("CHATBOT_IFRAME: chatBox element found."); } else { console.error("CHATBOT_IFRAME: chatBox element NOT found! Check ID."); }
+            if (userInput.length) { console.log("CHATBOT_IFRAME: userInput element found."); } else { console.error("CHATBOT_IFRAME: userInput element NOT found! Check ID."); }
+            if (sendButton.length) { console.log("CHATBOT_IFRAME: sendButton element found."); } else { console.error("CHATBOT_IFRAME: sendButton element NOT found! Check ID."); }
+
+            function appendMessage(sender, message) {
+                const messageDiv = $('<div>').addClass('chat-message');
+                if (sender === 'user') {
+                    messageDiv.addClass('user-message');
+                    messageDiv.text(message);
+                } else {
+                    messageDiv.addClass('bot-message');
+                    // Removed the JavaScript replace to add target="_parent"
+                    // This is now handled by Django views.py directly when generating the response.
+                    messageDiv.html(message);
+                }
+                chatBox.append(messageDiv);
+                chatBox.scrollTop(chatBox.prop("scrollHeight"));
+                console.log(`CHATBOT_IFRAME: Appended message from ${sender}: "${message.substring(0, Math.min(message.length, 50))}..."`);
+            }
+
+            function sendMessage() {
+                console.log("CHATBOT_IFRAME: sendMessage function called.");
+                const message = userInput.val().trim();
+                console.log("CHATBOT_IFRAME: User input message:", message);
+
+                if (message === '') {
+                    console.log("CHATBOT_IFRAME: Empty message detected. Not sending.");
+                    return;
+                }
+
+                appendMessage('user', message);
+                userInput.val('');
+
+                console.log("CHATBOT_IFRAME: Initiating AJAX request to Django backend...");
+                $.ajax({
+                    url: '{% url "shop:chatbot" %}',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ 'message': message }),
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    success: function(response) {
+                        console.log("CHATBOT_IFRAME: AJAX success response:", response);
+                        if (response.response) {
+                            appendMessage('bot', response.response);
+                        } else if (response.error) {
+                            appendMessage('bot', 'Error: ' + response.error);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("CHATBOT_IFRAME: AJAX error:", status, error, xhr.responseText);
+                        appendMessage('bot', 'Oops! Something went wrong. Please try again later.');
+                    }
+                });
+            }
+
+            sendButton.on('click', sendMessage);
+            console.log("CHATBOT_IFRAME: Click listener attached to sendButton.");
+
+            userInput.on('keypress', function(e) {
+                if (e.which === 13) {
+                    console.log("CHATBOT_IFRAME: Enter key pressed on input field.");
+                    sendMessage();
+                }
+            });
+            console.log("CHATBOT_IFRAME: Keypress listener attached to userInput.");
+
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                console.log(`CHATBOT_IFRAME: CSRF token found: ${cookieValue ? cookieValue.substring(0, 10) + '...' : 'None'}`);
+                return cookieValue;
+            }
+        });
+    </script>
+</body>
+</html>
