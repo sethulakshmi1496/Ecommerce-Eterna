@@ -9,10 +9,20 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
+# settings.py
 
 from pathlib import Path
-
 from django.conf.global_settings import LOGIN_URL
+import os # Ensure os is imported at the top
+
+# For local development: load environment variables from .env file
+# (This part requires python-dotenv, which you already have in requirements.txt)
+try:
+    import dotenv
+    dotenv.load_dotenv()
+except ImportError:
+    pass # python-dotenv might not be installed/needed in production environment
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -22,22 +32,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-wblnnx#3yn9^kmrn944)$(a@1j9tbtu6e2*9j!7jz6thc31=&b'
+# Get SECRET_KEY from environment variable (REQUIRED for production)
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-wblnnx#3yn9^kmrn944)$(a@1j9tbtu6e2*9j!7jz6thc31=&b')
+# The default value ('django-insecure-...') is only for local development
+# Make sure to set SECRET_KEY in Render environment variables for production!
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
-import os
-
-# ... other settings ...
-
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True' # Default to False for safety
 
+
+# ALLOWED_HOSTS - Crucial for production
 ALLOWED_HOSTS = []
+# Get Render's external hostname
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+# Get additional hosts from your own DJANGO_ALLOWED_HOSTS env var (if any)
 if os.environ.get('DJANGO_ALLOWED_HOSTS'):
-    ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS').split(',')
-elif not DEBUG: # If DEBUG is False and ALLOWED_HOSTS is not set, this is a problem
-    # You might want to raise an error here to ensure it's always set
-    # raise Exception("DJANGO_ALLOWED_HOSTS environment variable must be set when DEBUG is False.")
-    pass # Or handle as appropriate
+    ALLOWED_HOSTS.extend(os.environ.get('DJANGO_ALLOWED_HOSTS').split(','))
+# For local development: allow localhost
+if DEBUG:
+    ALLOWED_HOSTS.append('localhost')
+    ALLOWED_HOSTS.append('127.0.0.1')
 
 
 # Application definition
@@ -48,11 +65,17 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles','shop','cart','crispy_forms','crispy_bootstrap5',
+    'django.contrib.staticfiles',
+    'shop',
+    'cart',
+    'crispy_forms',
+    'crispy_bootstrap5',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Add WhiteNoiseMiddleware right after SecurityMiddleware for static files
+    'whitenoise.middleware.WhiteNoiseMiddleware', # <--- ADD THIS LINE
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -62,7 +85,6 @@ MIDDLEWARE = [
 ]
 AUTH_USER_MODEL="shop.CustomUser"
 ROOT_URLCONF = 'FashionStore.urls'
-import os
 
 LOGIN_URL="shop:signin"
 
@@ -90,12 +112,16 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'  # Example: Gmail SMTP server
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'sethulakshmi1496@gmail.com'  # Your email address
-EMAIL_HOST_PASSWORD = 'uotu egcx yiox dlay'
+# Get email credentials from environment variables for security
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'sethulakshmi1496@gmail.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'uotu egcx yiox dlay')
 
 
 MEDIA_ROOT=os.path.join(BASE_DIR,'media')
 MEDIA_URL='/media/'
+# IMPORTANT: Media files stored on Render's ephemeral filesystem will be lost.
+# For production, consider cloud storage like AWS S3 or Cloudinary.
+
 
 CRISPY_ALLOWED_TEMPLATE_PACKS="bootstrap5"
 CRISPY_TEMPLATE_PACK="bootstrap5"
@@ -103,12 +129,13 @@ CRISPY_TEMPLATE_PACK="bootstrap5"
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+import dj_database_url # Ensure this import is here or at the top
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default='sqlite:///db.sqlite3', # Fallback to SQLite for local development
+        conn_max_age=600 # Optional: maintain database connections for a duration
+    )
 }
 
 
@@ -148,6 +175,15 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS=[os.path.join(BASE_DIR,'static')]
+STATIC_ROOT = BASE_DIR / 'staticfiles' # <--- ADD THIS LINE: Collects all static files here for WhiteNoise
+
+# WhiteNoise storage configuration for optimized static file serving
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage", # <--- ADD THIS BLOCK
+    },
+}
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
