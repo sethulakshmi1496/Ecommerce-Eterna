@@ -1,8 +1,7 @@
 # Environment variables file
 .env
 
-# SQLite database file
-db.sqlite3
+
 
 # Python virtual environment
 .venv/
