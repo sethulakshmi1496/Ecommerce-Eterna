@@ -56,3 +56,4 @@ gunicorn
 whitenoise
 dj-database-url
 python-dotenv
+psycopg2-binary
